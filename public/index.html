@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 쥐와 다람쥐 - LP 뮤직 플레이어</title>
+    <style>
+        /* ─── 기본 리셋 & 배경 ─── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a2e;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 40%, #16213e 70%, #0f0f1a 100%);
+            font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ─── 배경 파티클 ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.15), transparent),
+                radial-gradient(2px 2px at 40% 70%, rgba(255,255,255,0.1), transparent),
+                radial-gradient(2px 2px at 60% 20%, rgba(255,255,255,0.12), transparent),
+                radial-gradient(2px 2px at 80% 50%, rgba(255,255,255,0.08), transparent),
+                radial-gradient(1px 1px at 10% 80%, rgba(255,255,255,0.15), transparent),
+                radial-gradient(1px 1px at 70% 90%, rgba(255,255,255,0.1), transparent),
+                radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.12), transparent),
+                radial-gradient(1px 1px at 50% 50%, rgba(255,255,255,0.08), transparent);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ─── 앰비언트 글로우 ─── */
+        .ambient-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0;
+            transition: opacity 1.5s ease;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .ambient-glow.glow-1 {
+            top: -200px;
+            left: -200px;
+            background: rgba(108, 92, 231, 0.15);
+        }
+
+        .ambient-glow.glow-2 {
+            bottom: -200px;
+            right: -200px;
+            background: rgba(253, 121, 168, 0.12);
+        }
+
+        .ambient-glow.active {
+            opacity: 1;
+            animation: glowPulse 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes glowPulse {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* ─── 타이틀 ─── */
+        .title {
+            color: #e2e2e2;
+            font-size: 1.6rem;
+            font-weight: 300;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            margin-bottom: 50px;
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            opacity: 0;
+            animation: fadeInDown 1s ease 0.3s forwards;
+        }
+
+        .title span {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 10px;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ─── LP 컨테이너 ─── */
+        .lp-container {
+            position: relative;
+            z-index: 1;
+            opacity: 0;
+            animation: fadeIn 1s ease 0.6s forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* ─── 톤암 ─── */
+        .tonearm-container {
+            position: absolute;
+            top: -30px;
+            right: -40px;
+            z-index: 10;
+            transform-origin: 85% 8%;
+            transform: rotate(-30deg);
+            transition: transform 1s cubic-bezier(0.68, -0.15, 0.27, 1.15);
+        }
+
+        .tonearm-container.playing {
+            transform: rotate(0deg);
+        }
+
+        .tonearm {
+            width: 8px;
+            height: 180px;
+            background: linear-gradient(180deg, #ccc 0%, #888 50%, #666 100%);
+            border-radius: 4px;
+            position: relative;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .tonearm::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle, #ddd, #999);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+
+        .tonearm::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 12px;
+            background: linear-gradient(180deg, #888, #444);
+            border-radius: 0 0 4px 4px;
+        }
+
+        /* ─── LP 레코드판 ─── */
+        .lp-record {
+            width: 350px;
+            height: 350px;
+            border-radius: 50%;
+            position: relative;
+            background:
+                radial-gradient(circle at center, transparent 3px, rgba(0,0,0,0.8) 4px, transparent 5px),
+                radial-gradient(circle at center, transparent 27%, rgba(40,40,40,0.6) 27.2%, transparent 27.4%),
+                radial-gradient(circle at center, transparent 30%, rgba(50,50,50,0.5) 30.2%, transparent 30.4%),
+                radial-gradient(circle at center, transparent 33%, rgba(40,40,40,0.6) 33.2%, transparent 33.4%),
+                radial-gradient(circle at center, transparent 36%, rgba(50,50,50,0.5) 36.2%, transparent 36.4%),
+                radial-gradient(circle at center, transparent 39%, rgba(40,40,40,0.6) 39.2%, transparent 39.4%),
+                radial-gradient(circle at center, transparent 42%, rgba(50,50,50,0.5) 42.2%, transparent 42.4%),
+                radial-gradient(circle at center, transparent 45%, rgba(40,40,40,0.6) 45.2%, transparent 45.4%),
+                radial-gradient(circle at center, transparent 48%, rgba(50,50,50,0.5) 48.2%, transparent 48.4%),
+                radial-gradient(circle at center, transparent 51%, rgba(40,40,40,0.6) 51.2%, transparent 51.4%),
+                radial-gradient(circle at center, transparent 54%, rgba(50,50,50,0.5) 54.2%, transparent 54.4%),
+                radial-gradient(circle at center, transparent 57%, rgba(40,40,40,0.6) 57.2%, transparent 57.4%),
+                radial-gradient(circle at center, transparent 60%, rgba(50,50,50,0.5) 60.2%, transparent 60.4%),
+                radial-gradient(circle at center, transparent 63%, rgba(40,40,40,0.6) 63.2%, transparent 63.4%),
+                radial-gradient(circle at center, transparent 66%, rgba(50,50,50,0.5) 66.2%, transparent 66.4%),
+                radial-gradient(circle at center, transparent 69%, rgba(40,40,40,0.6) 69.2%, transparent 69.4%),
+                radial-gradient(circle at center, transparent 72%, rgba(50,50,50,0.5) 72.2%, transparent 72.4%),
+                radial-gradient(circle at center, transparent 75%, rgba(40,40,40,0.6) 75.2%, transparent 75.4%),
+                radial-gradient(circle at center, transparent 78%, rgba(50,50,50,0.5) 78.2%, transparent 78.4%),
+                radial-gradient(circle at center, transparent 81%, rgba(40,40,40,0.6) 81.2%, transparent 81.4%),
+                radial-gradient(circle at center, transparent 84%, rgba(50,50,50,0.5) 84.2%, transparent 84.4%),
+                radial-gradient(circle at center, transparent 87%, rgba(40,40,40,0.6) 87.2%, transparent 87.4%),
+                radial-gradient(circle at center, transparent 90%, rgba(50,50,50,0.5) 90.2%, transparent 90.4%),
+                radial-gradient(circle at center, transparent 93%, rgba(40,40,40,0.6) 93.2%, transparent 93.4%),
+                radial-gradient(circle at center, transparent 96%, rgba(50,50,50,0.5) 96.2%, transparent 96.4%),
+                conic-gradient(
+                    from 0deg,
+                    rgba(255,255,255,0) 0deg,
+                    rgba(255,255,255,0.03) 30deg,
+                    rgba(255,255,255,0) 60deg,
+                    rgba(255,255,255,0.05) 120deg,
+                    rgba(255,255,255,0) 150deg,
+                    rgba(255,255,255,0.03) 210deg,
+                    rgba(255,255,255,0) 240deg,
+                    rgba(255,255,255,0.04) 300deg,
+                    rgba(255,255,255,0) 360deg
+                ),
+                radial-gradient(circle, #2a2a2a 25%, #1a1a1a 50%, #111 75%, #222 100%);
+            box-shadow:
+                0 0 0 4px #333,
+                0 0 0 6px #1a1a1a,
+                0 8px 30px rgba(0,0,0,0.6),
+                0 0 60px rgba(0,0,0,0.3),
+                inset 0 0 30px rgba(0,0,0,0.5);
+            animation-name: spin;
+            animation-duration: 3s;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-play-state: paused;
+            transition: box-shadow 0.5s ease;
+        }
+
+        .lp-record.playing {
+            animation-play-state: running;
+            box-shadow:
+                0 0 0 4px #333,
+                0 0 0 6px #1a1a1a,
+                0 8px 30px rgba(0,0,0,0.6),
+                0 0 60px rgba(108, 92, 231, 0.15),
+                0 0 100px rgba(108, 92, 231, 0.08),
+                inset 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* ─── 센터 라벨 ─── */
+        .center-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50%;
+            height: 50%;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid #444;
+            box-shadow:
+                0 0 15px rgba(0,0,0,0.5),
+                inset 0 0 10px rgba(0,0,0,0.3);
+            z-index: 2;
+        }
+
+        .center-label img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .center-label::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #555 30%, #222 70%);
+            border-radius: 50%;
+            border: 2px solid #666;
+            z-index: 3;
+        }
+
+        /* ─── 컨트롤 버튼 ─── */
+        .controls {
+            display: flex;
+            gap: 24px;
+            margin-top: 50px;
+            position: relative;
+            z-index: 1;
+            opacity: 0;
+            animation: fadeIn 1s ease 0.9s forwards;
+        }
+
+        .btn {
+            width: 80px;
+            height: 80px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: all 0.3s ease;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-play {
+            background: linear-gradient(145deg, #6c5ce7, #4834d4);
+            box-shadow:
+                0 4px 15px rgba(108, 92, 231, 0.4),
+                0 0 0 3px rgba(108, 92, 231, 0.1),
+                inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+
+        .btn-play:hover {
+            transform: scale(1.1);
+            box-shadow:
+                0 6px 25px rgba(108, 92, 231, 0.6),
+                0 0 0 5px rgba(108, 92, 231, 0.15),
+                inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .btn-play:active { transform: scale(0.95); }
+
+        .btn-play svg {
+            width: 28px;
+            height: 28px;
+            fill: white;
+            margin-left: 4px;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+        }
+
+        .btn-stop {
+            background: linear-gradient(145deg, #636e72, #4a5568);
+            box-shadow:
+                0 4px 15px rgba(99, 110, 114, 0.4),
+                0 0 0 3px rgba(99, 110, 114, 0.1),
+                inset 0 1px 0 rgba(255,255,255,0.15);
+        }
+
+        .btn-stop:hover {
+            transform: scale(1.1);
+            box-shadow:
+                0 6px 25px rgba(99, 110, 114, 0.6),
+                0 0 0 5px rgba(99, 110, 114, 0.15),
+                inset 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .btn-stop:active { transform: scale(0.95); }
+
+        .btn-stop svg {
+            width: 22px;
+            height: 22px;
+            fill: white;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2));
+        }
+
+        .btn-label {
+            position: absolute;
+            bottom: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        /* ─── 상태 표시 ─── */
+        .status {
+            margin-top: 45px;
+            color: #666;
+            font-size: 0.8rem;
+            letter-spacing: 3px;
+            position: relative;
+            z-index: 1;
+            height: 20px;
+            opacity: 0;
+            animation: fadeIn 1s ease 1.2s forwards;
+        }
+
+        .status.playing {
+            color: #6c5ce7;
+            animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        /* ─── 프로그레스 바 ─── */
+        .progress-container {
+            width: 350px;
+            margin-top: 20px;
+            position: relative;
+            z-index: 1;
+            opacity: 0;
+            animation: fadeIn 1s ease 1.3s forwards;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+            border-radius: 2px;
+            transition: width 0.3s linear;
+        }
+
+        .progress-bar-bg:hover .progress-bar-fill {
+            height: 6px;
+            margin-top: -1px;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.65rem;
+            color: #555;
+            letter-spacing: 1px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ─── 트랙 선택 ─── */
+        .track-selector {
+            margin-top: 25px;
+            position: relative;
+            z-index: 1;
+            opacity: 0;
+            animation: fadeIn 1s ease 1.4s forwards;
+        }
+
+        .track-selector label {
+            color: #666;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-right: 10px;
+        }
+
+        .track-select {
+            padding: 10px 20px;
+            border-radius: 25px;
+            border: 2px solid #333;
+            background: rgba(255,255,255,0.05);
+            color: #ccc;
+            font-size: 0.8rem;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            padding-right: 40px;
+            min-width: 250px;
+        }
+
+        .track-select:focus {
+            border-color: #6c5ce7;
+            box-shadow: 0 0 20px rgba(108, 92, 231, 0.15);
+        }
+
+        .track-select option {
+            background: #1a1a2e;
+            color: #ccc;
+            padding: 10px;
+        }
+
+        /* ─── 볼륨 ─── */
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 20px;
+            position: relative;
+            z-index: 1;
+            opacity: 0;
+            animation: fadeIn 1s ease 1.5s forwards;
+        }
+
+        .volume-icon {
+            width: 18px;
+            height: 18px;
+            fill: #666;
+        }
+
+        .volume-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #6c5ce7;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(108, 92, 231, 0.4);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #6c5ce7;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 8px rgba(108, 92, 231, 0.4);
+        }
+
+        .volume-label {
+            color: #555;
+            font-size: 0.65rem;
+            letter-spacing: 1px;
+            min-width: 35px;
+        }
+
+        /* ─── 반응형 ─── */
+        @media (max-width: 600px) {
+            .lp-record {
+                width: 260px;
+                height: 260px;
+            }
+
+            .title {
+                font-size: 1.2rem;
+                letter-spacing: 4px;
+                margin-bottom: 35px;
+            }
+
+            .progress-container {
+                width: 260px;
+            }
+
+            .btn {
+                width: 65px;
+                height: 65px;
+            }
+
+            .tonearm-container {
+                top: -20px;
+                right: -30px;
+            }
+
+            .tonearm {
+                height: 130px;
+                width: 6px;
+            }
+
+            .track-select {
+                min-width: 200px;
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 앰비언트 조명 -->
+    <div class="ambient-glow glow-1" id="glow1"></div>
+    <div class="ambient-glow glow-2" id="glow2"></div>
+
+    <!-- 타이틀 -->
+    <div class="title">
+        쥐와 다람쥐
+        <span>Vinyl Music Player</span>
+    </div>
+
+    <!-- LP 컨테이너 -->
+    <div class="lp-container">
+        <div class="tonearm-container" id="tonearm">
+            <div class="tonearm"></div>
+        </div>
+        <div class="lp-record" id="lpRecord">
+            <div class="center-label">
+                <img src="./album-art.jpg" alt="쥐와 다람쥐" id="albumArt">
+            </div>
+        </div>
+    </div>
+
+    <!-- 컨트롤 버튼 -->
+    <div class="controls">
+        <button class="btn btn-play" id="playBtn" onclick="playMusic()" title="Play">
+            <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+            <span class="btn-label">Play</span>
+        </button>
+        <button class="btn btn-stop" id="stopBtn" onclick="stopMusic()" title="Stop">
+            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            <span class="btn-label">Stop</span>
+        </button>
+    </div>
+
+    <!-- 상태 -->
+    <div class="status" id="statusText">READY</div>
+
+    <!-- 프로그레스 바 -->
+    <div class="progress-container">
+        <div class="progress-bar-bg" id="progressBar" onclick="seekTrack(event)">
+            <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="time-display">
+            <span id="currentTime">0:00</span>
+            <span id="totalTime">0:00</span>
+        </div>
+    </div>
+
+    <!-- 트랙 선택 -->
+    <div class="track-selector">
+        <label>Track</label>
+        <select class="track-select" id="trackSelect" onchange="changeTrack()">
+            <!--
+                ★★★ 여기에 음원 파일을 추가하세요 ★★★
+                value = 파일 경로 (public 폴더 기준)
+            -->
+            <option value="./music/song1.mp3">🎵 Track 01 - 쥐와 다람쥐</option>
+            <option value="./music/song2.mp3">🎵 Track 02 - 두 번째 노래</option>
+            <option value="./music/song3.mp4">🎵 Track 03 - 세 번째 노래 (mp4)</option>
+        </select>
+    </div>
+
+    <!-- 볼륨 -->
+    <div class="volume-container">
+        <svg class="volume-icon" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+        <input type="range" class="volume-slider" id="volumeSlider"
+               min="0" max="100" value="80" oninput="changeVolume(this.value)">
+        <span class="volume-label" id="volumeLabel">80%</span>
+    </div>
+
+    <script>
+        // ─── 오디오 엔진 ───
+        const audio = new Audio();
+        let isPlaying = false;
+        let progressInterval = null;
+
+        // 초기 설정
+        audio.src = document.getElementById('trackSelect').value;
+        audio.volume = 0.8;
+        audio.preload = 'metadata';
+
+        // ─── Play ───
+        function playMusic() {
+            audio.play().then(() => {
+                isPlaying = true;
+
+                document.getElementById('lpRecord').classList.add('playing');
+                document.getElementById('tonearm').classList.add('playing');
+                document.getElementById('glow1').classList.add('active');
+                document.getElementById('glow2').classList.add('active');
+
+                const status = document.getElementById('statusText');
+                status.textContent = '♫ NOW PLAYING';
+                status.classList.add('playing');
+
+                startProgressUpdate();
+            }).catch(err => {
+                console.error('재생 실패:', err);
+                document.getElementById('statusText').textContent = '⚠ 파일을 불러올 수 없습니다';
+            });
+        }
+
+        // ─── Stop ───
+        function stopMusic() {
+            audio.pause();
+            audio.currentTime = 0;
+            isPlaying = false;
+
+            document.getElementById('lpRecord').classList.remove('playing');
+            document.getElementById('tonearm').classList.remove('playing');
+            document.getElementById('glow1').classList.remove('active');
+            document.getElementById('glow2').classList.remove('active');
+
+            const status = document.getElementById('statusText');
+            status.textContent = '■ STOPPED';
+            status.classList.remove('playing');
+
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('currentTime').textContent = '0:00';
+            stopProgressUpdate();
+        }
+
+        // ─── 트랙 변경 ───
+        function changeTrack() {
+            const wasPlaying = isPlaying;
+            stopMusic();
+
+            audio.src = document.getElementById('trackSelect').value;
+            audio.load();
+
+            document.getElementById('statusText').textContent = '♫ TRACK LOADED';
+
+            if (wasPlaying) {
+                setTimeout(() => playMusic(), 300);
+            }
+        }
+
+        // ─── 볼륨 ───
+        function changeVolume(val) {
+            audio.volume = val / 100;
+            document.getElementById('volumeLabel').textContent = val + '%';
+        }
+
+        // ─── 프로그레스 바 ───
+        function startProgressUpdate() {
+            stopProgressUpdate();
+            progressInterval = setInterval(updateProgress, 250);
+        }
+
+        function stopProgressUpdate() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function updateProgress() {
+            if (audio.duration) {
+                const percent = (audio.currentTime / audio.duration) * 100;
+                document.getElementById('progressFill').style.width = percent + '%';
+                document.getElementById('currentTime').textContent = formatTime(audio.currentTime);
+                document.getElementById('totalTime').textContent = formatTime(audio.duration);
+            }
+        }
+
+        function seekTrack(e) {
+            const bar = document.getElementById('progressBar');
+            const rect = bar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percent = clickX / rect.width;
+
+            if (audio.duration) {
+                audio.currentTime = percent * audio.duration;
+                updateProgress();
+            }
+        }
+
+        function formatTime(sec) {
+            if (isNaN(sec)) return '0:00';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        // ─── 재생 종료 이벤트 ───
+        audio.addEventListener('ended', () => {
+            stopMusic();
+            document.getElementById('statusText').textContent = '♫ ENDED';
+        });
+
+        // ─── 메타데이터 로드 ───
+        audio.addEventListener('loadedmetadata', () => {
+            document.getElementById('totalTime').textContent = formatTime(audio.duration);
+        });
+    </script>
+
+</body>
+</html>
